@@ -75,6 +75,11 @@ char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat",}
 int t_start = startHour * 60 + startMinute;
 int t_end = endHour * 60 + endMinute;
 
+// read line from serial input
+char serialRead[30];
+int srPos = 0;
+const char delimeters[] = " :-_\t";
+
 // good flower
 static const unsigned char bitmap_good[] U8G_PROGMEM = {
   0x00, 0x42, 0x4C, 0x00, 0x00, 0xE6, 0x6E, 0x00, 0x00, 0xAE, 0x7B, 0x00, 0x00, 0x3A, 0x51, 0x00,
@@ -209,6 +214,10 @@ void loop() {
       drawtime();
     } while (u8g.nextPage());
   }
+
+  // for getting and setting the time through serial console
+  while (Serial.available() > 0)
+    readSerial();
 }
 
 // Set moisture value based on sensor readout
@@ -264,7 +273,7 @@ void pump_switch() {
 void water_flower() {
   relay_state_flag = false;
   for (int i = 0; i < sensors; ++i) {
-    if (moisture_value[i] < min_moisture[i]) {
+    if (moisture_value[i] < min_moisture[i] && inTimeFrame()) {
       digitalWrite(relay[i], HIGH);
       relay_state_flag = true;
       delay(50);
@@ -347,4 +356,39 @@ bool inTimeFrame() {
       return true;
   }
   return false;
+}
+
+void printTime() {
+  DateTime now = RTC.now();
+  char nowText[32];
+  sprintf(nowText, "RTC reports %d-%d-%d %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  Serial.println(nowText);
+}
+
+void readSerial() {
+  int c = Serial.read();
+  switch (c) {
+    case '\r': break; // ignore
+    case '\n': 
+      int i = 0;
+      char *dt[6];
+      srPos = 0;
+      dt[i] = strtok(serialRead, delimeters);
+      while (dt[i] != NULL)
+        dt[++i] = strtok(NULL, delimeters);
+      if (dt[0]) {
+        if (dt[1] && dt[2] && dt[3] && dt[4] && dt[5]) {
+          Serial.println("Adjusting RTC");
+          RTC.adjust(DateTime(atoi(dt[0]), atoi(dt[1]), atoi(dt[2]), atoi(dt[3]), atoi(dt[4]), atoi(dt[5])));
+          printTime();
+        }
+      } else
+        printTime();
+      break;
+    default:
+      if (srPos < 29) {
+        serialRead[srPos++] = c;
+        serialRead[srPos] = 0;
+      }
+  }
 }
