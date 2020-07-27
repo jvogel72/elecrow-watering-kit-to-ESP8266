@@ -1,3 +1,9 @@
+# code cleanup
+The original code from Elecrow needed some cleanup (usused code, logo display, display driver, duplicate code blocks).
+Since I also aim to use the water level sensor together with the Elecrow Watering Kit, I've used the codebase by rfrancis97.
+In order to compile this code, the U8glib (which has been unmaintained for several years) must be patched using the patch file U8glib.patch.
+As an alternative for patching the U8glib, the U8GLIB_SSD1306_130X64 can be replaced with the original U8GLIB_SSD1306_128X64, which shows the two rows of pixels at the right edge of the screen.
+
 # elecrow-watering-kit-to-ESP8266
 I wanted to modify the code for the Elecrow Watering kit to read moisture and water level data and send it over MQTT to Node-RED or Home Assistant via wifi using an ESP8266 NodeMCU.
 It is necessary to have an Elecrow Leonardo Watering Kit relay board that has the correct Arduino uploader to modify the existing code. I had to specifically request a replacement, but you can install the uploader using another Arduino.
