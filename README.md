@@ -1,3 +1,10 @@
+# timewindow per day and RTC configuration
+More code cleanup to get the size of the sketch reduced.
+
+In addition, functionality has been added to define an operating window for the watering system. This is done by defining a starting and end time, which will allow the watering system to work in a specific timeframe every day.
+
+In order to adjust the RTC, the serial interface is now listening and will report the time and date when sending an empty line. In addition, it will parse a line containing "year month day hour minute second" and set the RTC using these values.
+
 # code cleanup
 The original code from Elecrow needed some cleanup (usused code, logo display, display driver, duplicate code blocks).
 Since I also aim to use the water level sensor together with the Elecrow Watering Kit, I've used the codebase by rfrancis97.
