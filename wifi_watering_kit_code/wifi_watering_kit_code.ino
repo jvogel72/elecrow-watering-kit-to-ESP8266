@@ -26,7 +26,7 @@ int sensor_wet[ sensors ] = {360, 360, 360, 360};
 // internal veriables follow, no need to edit
 
 // display text for operating time
-String operateTime = "";
+char operateTime[13];
 
 // set all moisture sensors PIN ID
 int moisture[sensors] = {A0, A1, A2, A3};
@@ -49,8 +49,10 @@ int button = 12;
 //pump state    1:open   0:close
 int pump_state_flag = 0;
 
-//relay states   1:open   0:close
-int relay_state_flag[ sensors ] = {0, 0, 0, 0};
+// relay state
+//   true:  one or more relays are open
+//   false: all relays are closed
+bool relay_state_flag = false;
 
 //enable pump   1 = enabled   0 = disabled
 int enable_pump = 1;
@@ -148,8 +150,6 @@ void setup() {
   pinMode(pump, OUTPUT);
   // declare switch as input
   pinMode(button, INPUT);
-  //pinMode(ROTARY_ANGLE_SENSOR, INPUT);
-  // water_flower();
 }
 
 void loop() {
@@ -199,7 +199,6 @@ void loop() {
     u8g.firstPage();
     do {
       drawtime();
-      u8g.drawStr(8, 55 , "www.elecrow.com");
     } while (u8g.nextPage());
   }
 }
@@ -208,6 +207,7 @@ void loop() {
 //   600 is dry - value of 600 and above is 0%
 //   360 is wet - value of 360 is 100%
 void read_value() {
+  char ESPString[26];
   for (int i = 0; i < sensors; ++i) {
     float value = analogRead(moisture[i]);
     moisture_value[i] = map(value, sensor_dry[i], sensor_wet[i], 0, 100);
@@ -217,60 +217,21 @@ void read_value() {
     }
   }
   if (counter >= 470) {       //output frequency to ESP, 470 = approx 1 minute
-     static char A0_sensor[5]; 
-     static char A1_sensor[5];
-     static char A2_sensor[5];
-     static char A3_sensor[5];
-     static char pump_state[2];
-     static char water_level[5];
-  
-     dtostrf(moisture_value[0], 4, 0, A0_sensor);
-     dtostrf(moisture_value[1], 4, 0, A1_sensor);
-     dtostrf(moisture_value[2], 4, 0, A2_sensor);
-     dtostrf(moisture_value[3], 4, 0, A3_sensor);
-     dtostrf(pump_state_flag, 1, 0, pump_state);
-     dtostrf(water_level_value, 4, 0, water_level);
-
-     /*********Output Moisture Sensor values to ESP8266******/
-     Serial1.print(A0_sensor);
-     Serial1.print(",");
-     Serial1.print(A1_sensor);
-     Serial1.print(",");
-     Serial1.print(A2_sensor);
-     Serial1.print(",");
-     Serial1.print(A3_sensor);
-     Serial1.print(",");
-     Serial1.print(pump_state);
-     Serial1.print(",");
-     Serial1.print(water_level);
-     Serial1.print("\n");
-     delay(100);
-     counter = 0;
+    sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
+    /*********Output Moisture Sensor values to ESP8266******/
+    Serial1.println(ESPString);
+    delay(100);
+    counter = 0;
   
      /* Optional - to display on Arduino serial monitor */
 /*
-     Serial.print("A0: ");
-     Serial.print(A0_sensor);
-     Serial.print(", ");
-     Serial.print("A1: ");
-     Serial.print(A1_sensor);
-     Serial.print(", ");
-     Serial.print("A2: ");
-     Serial.print(A2_sensor);
-     Serial.print(", ");
-     Serial.print("A3: ");
-     Serial.print(A3_sensor);
-     Serial.print(", ");
-     Serial.print("Pump: ");
-     Serial.print(pump_state);
-     Serial.print(", ");
-     Serial.print("Water Level: ");
-     Serial.print(water_level);
-     Serial.println();
-     delay(50); 
+    char serialDebug[50];
+    sprintf(serialDebug, "A0: %d, A1: %d, A2: %d, A3: %d, Pump: %d, Water Level: %d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
+    Serial.println(serialDebug);
+    delay(50); 
 */     
- }
- counter++;
+  }
+  counter++;
 }
 
 void pump_on() {
@@ -286,27 +247,24 @@ void pump_off() {
 }
 
 void pump_switch() {
-  int sum = 0;
-  for (int i = 0; i < sensors; ++i)
-    sum += relay_state_flag[i];
-  if (sum == 0) {
-    pump_off();
-  } else {
+  if (relay_state_flag) {
     if (pump_state_flag == 0 && enable_pump == 1) {
       pump_on();
     }
+  } else {
+    pump_off;  
   }
 }
 
 void water_flower() {
+  relay_state_flag = false;
   for (int i = 0; i < sensors; ++i) {
     if (moisture_value[i] < min_moisture[i]) {
       digitalWrite(relay[i], HIGH);
-      relay_state_flag[i] = 1;
+      relay_state_flag = true;
       delay(50);
     } else if (moisture_value[i] > max_moisture[i]) {
       digitalWrite(relay[i], LOW);
-      relay_state_flag[i] = 0;
       delay(50);
     }
   }
@@ -315,15 +273,15 @@ void water_flower() {
 
 void draw_elecrow(void) {
   u8g.setFont(u8g_font_gdr9r);
-  u8g.drawStr(8,55 , "www.elecrow.com");
+  u8g.setPrintPos(8, 55);
+  u8g.print("www.elecrow.com");
   u8g.drawXBMP(0, 5, 128, 32, bitmap_logo);
 }
 
 void drawtime(void) {
-  int x = 5;
-  float i = 25.00;
-  float j = 54;
   DateTime now = RTC.now();
+  char t_time[8];
+  char t_date[10];
   if (! RTC.isrunning()) {
     u8g.setFont(u8g_font_6x10);
     u8g.setPrintPos(5, 20);
@@ -331,108 +289,42 @@ void drawtime(void) {
     RTC.adjust(DateTime(__DATE__, __TIME__));
   } else {
     u8g.setFont(u8g_font_7x13);
-    u8g.setPrintPos(x, 11);
-    u8g.print(now.year(), DEC);
-    u8g.setPrintPos(x + 80, 11);
+    sprintf(t_date, "%d/%d/%d", now.year(), now.month(), now.day());
+    u8g.setPrintPos(5, 11);
+    u8g.print(t_date);
+    u8g.setPrintPos(85, 11);
     u8g.print(daysOfTheWeek[now.dayOfTheWeek()]);
-    u8g.setPrintPos(x + 28, 11);
-    u8g.print("/");
-    u8g.setPrintPos(x + 33, 11);
-    u8g.print(now.month(), DEC);
-    if (now.month() < 10)
-      x -= 7;
-    u8g.setPrintPos(x + 47, 11);
-    u8g.print("/");
-    u8g.setPrintPos(x + 53, 11);
-    u8g.print(now.day(), DEC);
     u8g.setFont(u8g_font_8x13);
-    int x = 35;
-    u8g.setPrintPos(x, 33);
-    if (now.hour() < 10) {
-      u8g.print("0");
-      u8g.setPrintPos(x + 7, 33);
-    }
-    u8g.print(now.hour(), DEC);
-    u8g.setPrintPos(x + 15, 33);
-    u8g.print(":");
-    u8g.setPrintPos(x + 21, 33);
-    if (now.minute() < 10) {
-      u8g.print("0");
-      u8g.setPrintPos(x + 28, 33);
-    }
-    u8g.print(now.minute(), DEC);
-    u8g.setPrintPos(x + 36, 33);
-    u8g.print(":");
-    u8g.setPrintPos(x + 42, 33);
-    if (now.second() < 10) {
-      u8g.print("0");
-      u8g.setPrintPos(x + 49, 33);
-    }
-    u8g.print(now.second(), DEC);
+    sprintf(t_time, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+    u8g.setPrintPos(35, 33);
+    u8g.print(t_time);
+    u8g.setPrintPos(8, 55);
+    u8g.print("www.elecrow.com");
   }
-}
-
-void drawLogo(uint8_t d) {
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(8 + d, 30 + d, "E");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(30 + d, 30 + d, "l");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(40 + d, 30 + d, "e");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(55 + d, 30 + d, "c");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(70 + d, 30 + d, "r");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(85 + d, 30 + d, "o");
-  u8g.setFont(u8g_font_gdr25r);
-  u8g.drawStr(100 + d, 30 + d, "w");
 }
 
 //Style the flowers     bitmap_bad: bad flowers     bitmap_good:good  flowers
 void drawflower(void) {
   int flowerPosition[ sensors ] = {0, 32, 64, 96};
   for (int i = 0; i < sensors; ++i) {
-    if (moisture_value[i] < 30) {
+    if (moisture_value[i] < 30)
       u8g.drawXBMP(flowerPosition[i], 0, 32, 30, bitmap_bad);
-    } else {
+    else
       u8g.drawXBMP(flowerPosition[i], 0, 32, 30, bitmap_good);
-    }
   }
 }
 
 void drawTH(void) {
-  char moisture_value_temp[sensors][5] = {{0}, {0}, {0}, {0}};
-  int THPos[ sensors ] = {0, 32, 64, 96};
-  int printPos[ sensors ] = {9, 41, 73, 105};
-  String sensorNames[ sensors ] = {"A0", "A1", "A2", "A3"};
-
+  char sensorName[2];
+  char percentage[4];
   read_value();
-  for (int i = 0; i < sensors; ++i)
-    itoa(moisture_value[i], moisture_value_temp[i], 10);
   u8g.setFont(u8g_font_7x14);
-
   for (int i = 0; i < sensors; ++i) {
-    u8g.setPrintPos(printPos[i], 60);
-    u8g.print(sensorNames[i]);
-    if (moisture_value[i] < 10) {
-      //u8g.setPrintPos(THPos[i] + 14, 45 );
-      u8g.drawStr(THPos[i] + 14, 45, moisture_value_temp[i]);
-      delay(20);
-      u8g.drawStr(THPos[i] + 14, 45, moisture_value_temp[i]);
-    } else if (moisture_value[i] < 100) {
-      //u8g.setPrintPos(THPos[i] + 7, 45);
-      u8g.drawStr(THPos[i] + 7, 45, moisture_value_temp[i]);
-      delay(20);
-      u8g.drawStr(THPos[i] + 7, 45, moisture_value_temp[i]);
-    } else {
-      //u8g.setPrintPos(A + 2, 45 );
-      moisture_value[i] = 100;
-      itoa(moisture_value[i], moisture_value_temp[i], 10);
-      u8g.drawStr(THPos[i] + 2, 45, moisture_value_temp[i]);
-    }
-    //u8g.print(moisture[i]_value);
-    u8g.setPrintPos(THPos[i] + 23, 45 );
-    u8g.print("%");
+    sprintf(sensorName, "A%d", i);
+    u8g.setPrintPos((i * 32) + 9, 60);
+    u8g.print(sensorName);
+    sprintf(percentage, "%3d%c", moisture_value[i], '%');
+    u8g.setPrintPos((i * 32) + (moisture_value[i] == 100 ? 2 : 0), 45);
+    u8g.print(percentage);
   }
 }
