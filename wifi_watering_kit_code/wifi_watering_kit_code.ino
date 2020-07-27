@@ -15,6 +15,13 @@ int min_moisture[ sensors ] = {30, 30, 30, 30};
 // maximum moisture values above which the relay will close
 int max_moisture[ sensors ] = {55, 55, 55, 55};
 
+// timeframe during which the system may operate
+// to always operate, set to identical values 
+int startHour = 8;
+int startMinute = 0;
+int endHour = 20;
+int endMinute = 30;
+
 // edit only when calibrating sensors
 
 // resistance reported by sensor when detecting dry soil (higher is more dry)
@@ -63,10 +70,10 @@ int echo = A4;  //pin A4
 
 int counter = 0; //counter for output frequency to ESP
 
-static unsigned long currentMillis_send = 0;
-static unsigned long  Lasttime_send = 0;
-
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat",};
+
+int t_start = startHour * 60 + startMinute;
+int t_end = endHour * 60 + endMinute;
 
 // good flower
 static const unsigned char bitmap_good[] U8G_PROGMEM = {
@@ -150,6 +157,7 @@ void setup() {
   pinMode(pump, OUTPUT);
   // declare switch as input
   pinMode(button, INPUT);
+  sprintf(operateTime, "%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute);
 }
 
 void loop() {
@@ -210,11 +218,8 @@ void read_value() {
   char ESPString[26];
   for (int i = 0; i < sensors; ++i) {
     float value = analogRead(moisture[i]);
-    moisture_value[i] = map(value, sensor_dry[i], sensor_wet[i], 0, 100);
+    moisture_value[i] = constrain(map(value, sensor_dry[i], sensor_wet[i], 0, 100), 0, 100);
     delay(20);
-    if(moisture_value[i] < 0) {
-      moisture_value[i] = 0;
-    }
   }
   if (counter >= 470) {       //output frequency to ESP, 470 = approx 1 minute
     sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
@@ -298,8 +303,8 @@ void drawtime(void) {
     sprintf(t_time, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
     u8g.setPrintPos(35, 33);
     u8g.print(t_time);
-    u8g.setPrintPos(8, 55);
-    u8g.print("www.elecrow.com");
+    u8g.setPrintPos(12, 55);
+    u8g.print(operateTime);
   }
 }
 
@@ -327,4 +332,19 @@ void drawTH(void) {
     u8g.setPrintPos((i * 32) + (moisture_value[i] == 100 ? 2 : 0), 45);
     u8g.print(percentage);
   }
+}
+
+bool inTimeFrame() {
+  DateTime now = RTC.now();
+  int t_now = now.hour() * 60 + now.minute();
+  if (t_start == t_end) {
+    return true;
+  } else if (t_start < t_end) {
+    if (t_start <= t_now && t_now < t_end)
+      return true;
+  } else {
+    if (t_start <= t_now || t_now < t_end)
+      return true;
+  }
+  return false;
 }
