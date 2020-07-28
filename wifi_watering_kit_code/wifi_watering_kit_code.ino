@@ -365,25 +365,29 @@ void printTime() {
   Serial.println(nowText);
 }
 
+void commandRTC() {
+  int i = 0;
+  char *dt[6];
+  dt[i] = strtok(serialRead, delimeters);
+  while (dt[i] != NULL)
+    dt[++i] = strtok(NULL, delimeters);
+  if (dt[0]) {
+    if (dt[1] && dt[2] && dt[3] && dt[4] && dt[5]) {
+      Serial.println("Adjusting RTC");
+      RTC.adjust(DateTime(atoi(dt[0]), atoi(dt[1]), atoi(dt[2]), atoi(dt[3]), atoi(dt[4]), atoi(dt[5])));
+      printTime();
+    }
+  } else
+    printTime();
+}
+
 void readSerial() {
   int c = Serial.read();
   switch (c) {
     case '\r': break; // ignore
     case '\n': 
-      int i = 0;
-      char *dt[6];
       srPos = 0;
-      dt[i] = strtok(serialRead, delimeters);
-      while (dt[i] != NULL)
-        dt[++i] = strtok(NULL, delimeters);
-      if (dt[0]) {
-        if (dt[1] && dt[2] && dt[3] && dt[4] && dt[5]) {
-          Serial.println("Adjusting RTC");
-          RTC.adjust(DateTime(atoi(dt[0]), atoi(dt[1]), atoi(dt[2]), atoi(dt[3]), atoi(dt[4]), atoi(dt[5])));
-          printTime();
-        }
-      } else
-        printTime();
+      commandRTC();
       break;
     default:
       if (srPos < 29) {
