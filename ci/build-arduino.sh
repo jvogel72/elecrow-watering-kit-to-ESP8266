@@ -37,5 +37,5 @@ done
 
 # Compile all *.ino files for the ESP8266
 for f in ESP8266_watering_mqtt_client_code/*.ino ; do
-  arduino-cli compile -b esp8266:esp8266 $f
+  arduino-cli compile -b esp8266:esp8266:generic $f
 done
