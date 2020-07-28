@@ -17,11 +17,11 @@ mkdir $HOME/Arduino/libraries
 export PATH=$PATH:$GITHUB_WORKSPACE/bin
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 arduino-cli config init
-arduino-cli core update-index
+arduino-cli core update-index --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install Arduino AVR core and ESP8266 core
 arduino-cli core install arduino:avr
-#arduino-cli core install esp8266:esp8266 --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
+arduino-cli core install esp8266:esp8266
 
 # Install the required libraries
 arduino-cli lib install RTClib
@@ -36,6 +36,6 @@ for f in wifi_watering_kit_code/*.ino ; do
 done
 
 # Compile all *.ino files for the ESP8266
-#for f in ESP8266_watering_mqtt_client_code/*.ino ; do
-#  arduino-cli compile -b esp8266:esp8266 $f
-#done
+for f in ESP8266_watering_mqtt_client_code/*.ino ; do
+  arduino-cli compile -b esp8266:esp8266 $f
+done
