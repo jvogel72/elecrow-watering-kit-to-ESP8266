@@ -21,7 +21,7 @@ arduino-cli core update-index
 
 # Install Arduino AVR core and ESP8266 core
 arduino-cli core install arduino:avr
-arduino-cli core install esp8266:esp8266
+arduino-cli core install esp8266:esp8266 --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install the required libraries
 arduino-cli lib install RTClib
@@ -37,5 +37,5 @@ done
 
 # Compile all *.ino files for the ESP8266
 for f in ESP8266_watering_mqtt_client_code/*.ino ; do
-  arduino-cli compile -b arduino:esp8266:esp8266 $f
+  arduino-cli compile -b esp8266:esp8266 $f
 done
