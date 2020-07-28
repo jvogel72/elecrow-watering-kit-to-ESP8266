@@ -21,7 +21,7 @@ arduino-cli core update-index --additional-urls http://arduino.esp8266.com/stabl
 
 # Install Arduino AVR core and ESP8266 core
 arduino-cli core install arduino:avr
-arduino-cli core install esp8266:esp8266
+arduino-cli core install esp8266:esp8266 --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install the required libraries
 arduino-cli lib install RTClib
