@@ -8,8 +8,11 @@ In order to adjust the RTC, the serial interface is now listening and will repor
 # code cleanup
 The original code from Elecrow needed some cleanup (usused code, logo display, display driver, duplicate code blocks).
 Since I also aim to use the water level sensor together with the Elecrow Watering Kit, I've used the codebase by rfrancis97.
-In order to compile this code, the U8glib (which has been unmaintained for several years) must be patched using the patch file U8glib.patch.
-As an alternative for patching the U8glib, the U8GLIB_SSD1306_130X64 can be replaced with the original U8GLIB_SSD1306_128X64, which shows the two rows of pixels at the right edge of the screen.
+
+In order to compile this code, the U8glib (which has been unmaintained for several years) must be patched using the patch file U8glib.patch. The patch makes it possible to use the two lines at the right side of the screen, which also removes any random pixels which are usually visible there. There are three ways to deal with the 130 bit screen and 128 bit driver:
+  1. Use the last available U8glib 1.19.1 driver and change the code from U8GLIB_SSD1306_130X64 with the original U8GLIB_SSD1306_128X64
+  2. Install the U8glib-1.19.1-patched.zip as library. In Arduino IDE this is done by first removing any existing U9glib libraries. Then through the menu sequence "Sketch" -> "Include library" -> "Add .ZIP Library...", select the U8glib-1.19.1-patched.zip.
+  3. Install the U8glib (in Arduino IDE by installing using the "Library Manager" or by adding the .ZIP from the original developer). Then use the U8glib.patch file to apply the patch to the installed library (in Linux, use the "patch" command.
 
 # elecrow-watering-kit-to-ESP8266
 I wanted to modify the code for the Elecrow Watering kit to read moisture and water level data and send it over MQTT to Node-RED or Home Assistant via wifi using an ESP8266 NodeMCU.
