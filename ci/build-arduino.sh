@@ -24,6 +24,7 @@ arduino-cli core install arduino:avr
 arduino-cli core install esp8266:esp8266 --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install the required libraries
+arduino-cli lib install PubSubClient
 arduino-cli lib install RTClib
 arduino-cli lib install U8glib
 
