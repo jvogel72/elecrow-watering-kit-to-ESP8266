@@ -61,6 +61,10 @@ int pump_state_flag = 0;
 //   false: all relays are closed
 bool relay_state_flag = false;
 
+// for individual relays
+// relay state_flags    1:open   0:close
+int relay_state_flags[4];
+
 //enable pump   1 = enabled   0 = disabled
 int enable_pump = 1;
 
@@ -78,7 +82,12 @@ int t_end = endHour * 60 + endMinute;
 // read line from serial input
 char serialRead[30];
 int srPos = 0;
-const char delimeters[] = " :-_\t";
+char *serialVars[7];
+const char delimeters[] = " :-_,\t";
+
+// read line from serial1 input
+char serial1Read[30];
+int sr1Pos = 0;
 
 // good flower
 static const unsigned char bitmap_good[] U8G_PROGMEM = {
@@ -162,7 +171,7 @@ void setup() {
   pinMode(pump, OUTPUT);
   // declare switch as input
   pinMode(button, INPUT);
-  sprintf(operateTime, "%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute);
+  setOperateTime();
 }
 
 void loop() {
@@ -218,6 +227,10 @@ void loop() {
   // for getting and setting the time through serial console
   while (Serial.available() > 0)
     readSerial();
+
+  // ESP commands
+  while (Serial1.available() > 0)
+    readSerial1();
 }
 
 // Set moisture value based on sensor readout
@@ -275,10 +288,12 @@ void water_flower() {
   for (int i = 0; i < sensors; ++i) {
     if (moisture_value[i] < min_moisture[i] && inTimeFrame()) {
       digitalWrite(relay[i], HIGH);
+      relay_state_flags[i] = 1;
       relay_state_flag = true;
       delay(50);
     } else if (moisture_value[i] > max_moisture[i]) {
       digitalWrite(relay[i], LOW);
+      relay_state_flags[i] = 0;
       delay(50);
     }
   }
@@ -365,30 +380,66 @@ void printTime() {
   Serial.println(nowText);
 }
 
+void setOperateTime() {
+  sprintf(operateTime, "%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute);
+}
+
+void serialToVars() {
+  int i = 0;
+  serialVars[i] = strtok(serial1Read, delimeters);
+  while (serialVars[i] != NULL)
+    serialVars[++i] = strtok(NULL, delimeters);
+}
+
+void commandRTC() {
+  serialToVars();
+  if (serialVars[0]) {
+    if (serialVars[1] && serialVars[2] && serialVars[3] && serialVars[4] && serialVars[5]) {
+      Serial.println("Adjusting RTC");
+      RTC.adjust(DateTime(atoi(serialVars[0]), atoi(serialVars[1]), atoi(serialVars[2]), atoi(serialVars[3]), atoi(serialVars[4]), atoi(serialVars[5])));
+      printTime();
+    }
+  } else
+    printTime();
+}
+
+void commandESP() {
+  serialToVars();
+  // switch on [0] as command
+  // set
+  //   time - call commandRTC
+  //   operate timeframe - set 4 time variables and call setOperatetime
+  //   moisture - set min_moisture and max_moisture
+}
+
 void readSerial() {
   int c = Serial.read();
   switch (c) {
     case '\r': break; // ignore
     case '\n': 
-      int i = 0;
-      char *dt[6];
       srPos = 0;
-      dt[i] = strtok(serialRead, delimeters);
-      while (dt[i] != NULL)
-        dt[++i] = strtok(NULL, delimeters);
-      if (dt[0]) {
-        if (dt[1] && dt[2] && dt[3] && dt[4] && dt[5]) {
-          Serial.println("Adjusting RTC");
-          RTC.adjust(DateTime(atoi(dt[0]), atoi(dt[1]), atoi(dt[2]), atoi(dt[3]), atoi(dt[4]), atoi(dt[5])));
-          printTime();
-        }
-      } else
-        printTime();
+      commandESP();
       break;
     default:
       if (srPos < 29) {
         serialRead[srPos++] = c;
         serialRead[srPos] = 0;
+      }
+  }
+}
+
+void readSerial1() {
+  int c = Serial1.read();
+  switch (c) {
+    case '\r': break; // ignore
+    case '\n': 
+      sr1Pos = 0;
+      commandRTC();
+      break;
+    default:
+      if (srPos < 29) {
+        serial1Read[sr1Pos++] = c;
+        serial1Read[sr1Pos] = 0;
       }
   }
 }
