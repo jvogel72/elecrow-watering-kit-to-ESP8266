@@ -17,7 +17,7 @@ mkdir $HOME/Arduino/libraries
 export PATH=$PATH:$GITHUB_WORKSPACE/bin
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 arduino-cli config init
-arduino-cli core update-index --additional-urls https://dl.espressif.com/dl/package_esp32_index.json http://arduino.esp8266.com/stable/package_esp8266com_index.json
+arduino-cli core update-index --additional-urls https://dl.espressif.com/dl/package_esp32_index.json,http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install Arduino AVR core and ESP8266 core
 arduino-cli core install arduino:avr
