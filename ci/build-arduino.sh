@@ -17,11 +17,12 @@ mkdir $HOME/Arduino/libraries
 export PATH=$PATH:$GITHUB_WORKSPACE/bin
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 arduino-cli config init
-arduino-cli core update-index --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
+arduino-cli core update-index --additional-urls https://dl.espressif.com/dl/package_esp32_index.json http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 # Install Arduino AVR core and ESP8266 core
 arduino-cli core install arduino:avr
 arduino-cli core install esp8266:esp8266 --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
+arduino-cli core install esp32:esp32 --additional-urls https://dl.espressif.com/dl/package_esp32_index.json
 
 # Install the required libraries
 arduino-cli lib install PubSubClient
@@ -39,4 +40,9 @@ done
 # Compile all *.ino files for the ESP8266
 for f in ESP8266_watering_mqtt_client_code/*.ino ; do
   arduino-cli compile -b esp8266:esp8266:generic $f
+done
+
+# Compile all *.ino files for the ESP8266
+for f in ESP32_watering_mqtt_client_code/*.ino ; do
+  arduino-cli compile -b esp32:esp32:esp32 $f
 done
