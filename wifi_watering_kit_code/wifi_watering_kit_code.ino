@@ -5,6 +5,7 @@ U8GLIB_SSD1306_130X64 u8g(U8G_I2C_OPT_NONE);    // I2C
 #include "Wire.h"
 #include "RTClib.h"
 RTC_DS1307 RTC;
+#include "WaterData.h"
 
 // number of sensors and relays
 const int sensors = 4;
@@ -72,7 +73,9 @@ int enable_pump = 1;
 int trig = 1;   //pin D7
 int echo = A4;  //pin A4
 
-int counter = 0; //counter for output frequency to ESP
+// output frequency for sending data to the ESP
+TimeSpan outputFrequency = TimeSpan(0, 0, 1, 0);
+DateTime nextOutput;
 
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat",};
 
@@ -86,8 +89,24 @@ char *serialVars[7];
 const char delimeters[] = " :-_,\t";
 
 // read line from serial1 input
-char serial1Read[30];
+char serial1Read[50];
 int sr1Pos = 0;
+int serial1Vars[8];
+char ESPcmd[2];
+
+struct ESP_WATERING {
+  char command[1];
+  char moisture0[3];
+  char moisture1[3];
+  char moisture2[3];
+  char moisture3[3];
+  char relay0[1];
+  char relay1[1];
+  char relay2[1];
+  char relay3[1];
+  char pump[1];
+  char waterlevel[3];
+};
 
 // good flower
 static const unsigned char bitmap_good[] U8G_PROGMEM = {
@@ -172,6 +191,7 @@ void setup() {
   // declare switch as input
   pinMode(button, INPUT);
   setOperateTime();
+  nextOutput = RTC.now();
 }
 
 void loop() {
@@ -243,12 +263,14 @@ void read_value() {
     moisture_value[i] = constrain(map(value, sensor_dry[i], sensor_wet[i], 0, 100), 0, 100);
     delay(20);
   }
-  if (counter >= 470) {       //output frequency to ESP, 470 = approx 1 minute
+  if (RTC.now() >= nextOutput) {
+//  if (counter >= 470) {       //output frequency to ESP, 470 = approx 1 minute
     sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
     /*********Output Moisture Sensor values to ESP8266******/
     Serial1.println(ESPString);
-    delay(100);
-    counter = 0;
+//    delay(100);
+//    counter = 0;
+    nextOutput = RTC.now() + outputFrequency;
   
      /* Optional - to display on Arduino serial monitor */
 /*
@@ -258,7 +280,6 @@ void read_value() {
     delay(50); 
 */     
   }
-  counter++;
 }
 
 void pump_on() {
@@ -386,7 +407,7 @@ void setOperateTime() {
 
 void serialToVars() {
   int i = 0;
-  serialVars[i] = strtok(serial1Read, delimeters);
+  serialVars[i] = strtok(serialRead, delimeters);
   while (serialVars[i] != NULL)
     serialVars[++i] = strtok(NULL, delimeters);
 }
@@ -403,13 +424,56 @@ void commandRTC() {
     printTime();
 }
 
+/*
+ * Definition of communication between the Elecrow Watering Kit
+ * an Arduino Leonardo and boards using an ESP8266 or ESP32
+ * 
+ * All elements in the communication have a 4 byte length
+ * The first element defines the requested action
+ *   0001 - get minimum and maxmum moisture levels
+ *          response is 0001 appended with
+ *            first the four minumum levels
+ *            then the four maximum levels
+ *          both in the sequence of A0 through A3
+ *   0002 - set the minimum and maximum moisture levels
+ *          sequence is identical to command 1
+ *            first the four minumum levels
+ *            then the four maximum levels
+ *          both in the sequence of A0 through A3
+ *   0003 - get the timeframe in which the device operates 
+ *          response is 0003 appended with
+ *            start hour
+ *            start minute
+ *            end hour
+ *            end minute
+ *   0004 - set the timeframce in which the device operates
+ *          sequence is identical to command 0003
+ */
 void commandESP() {
-  serialToVars();
-  // switch on [0] as command
-  // set
-  //   time - call commandRTC
-  //   operate timeframe - set 4 time variables and call setOperatetime
-  //   moisture - set min_moisture and max_moisture
+  char serial1Reply[36];
+  switch (serial1Vars[0]) {
+    case 1:
+      sprintf(serial1Reply, "0001%04d%04d%04d%04d%04d%04d%04d%04d", min_moisture[0], min_moisture[1], min_moisture[2], min_moisture[3], max_moisture[0], max_moisture[1], max_moisture[2], max_moisture[3]);
+      Serial1.println(serial1Reply);
+      break;
+    case 2:
+      for (int i = 0; i < sensors; ++i) {
+        min_moisture[ i ] = serial1Vars[ i + 1 ];
+        max_moisture[ i ] = serial1Vars[ i + 5 ];
+      }
+      break;
+    case 3:
+      sprintf(serial1Reply, "0003%04d%04d%04d%04d", startHour, startMinute, endHour, endMinute);
+      Serial1.println(serial1Reply);
+      break;
+    case 4:
+      startHour = serial1Vars[ 1 ];
+      startMinute = serial1Vars[ 2 ];
+      endHour = serial1Vars[ 3 ];
+      endMinute = serial1Vars[ 4 ];
+      setOperateTime();
+      break;
+  }
 }
 
 void readSerial() {
@@ -418,7 +482,7 @@ void readSerial() {
     case '\r': break; // ignore
     case '\n': 
       srPos = 0;
-      commandESP();
+      commandRTC();
       break;
     default:
       if (srPos < 29) {
@@ -434,12 +498,15 @@ void readSerial1() {
     case '\r': break; // ignore
     case '\n': 
       sr1Pos = 0;
-      commandRTC();
+      commandESP();
       break;
     default:
-      if (srPos < 29) {
-        serial1Read[sr1Pos++] = c;
-        serial1Read[sr1Pos] = 0;
+      if (sr1Pos % 4 == 0 && sr1Pos / 4 > 0) {
+        serial1Vars[ sr1Pos / 4 - 1 ] = atoi(serial1Read);
+      }
+      if (sr1Pos < 49) {
+        serial1Read[ sr1Pos % 4 ] = c;
+        sr1Pos += 1;
       }
   }
 }
