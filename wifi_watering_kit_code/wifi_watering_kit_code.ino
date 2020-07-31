@@ -5,7 +5,6 @@ U8GLIB_SSD1306_130X64 u8g(U8G_I2C_OPT_NONE);    // I2C
 #include "Wire.h"
 #include "RTClib.h"
 RTC_DS1307 RTC;
-#include "WaterData.h"
 
 // number of sensors and relays
 const int sensors = 4;
@@ -91,22 +90,7 @@ const char delimeters[] = " :-_,\t";
 // read line from serial1 input
 char serial1Read[50];
 int sr1Pos = 0;
-int serial1Vars[8];
-char ESPcmd[2];
-
-struct ESP_WATERING {
-  char command[1];
-  char moisture0[3];
-  char moisture1[3];
-  char moisture2[3];
-  char moisture3[3];
-  char relay0[1];
-  char relay1[1];
-  char relay2[1];
-  char relay3[1];
-  char pump[1];
-  char waterlevel[3];
-};
+int serial1Vars[9];
 
 // good flower
 static const unsigned char bitmap_good[] U8G_PROGMEM = {
@@ -264,12 +248,9 @@ void read_value() {
     delay(20);
   }
   if (RTC.now() >= nextOutput) {
-//  if (counter >= 470) {       //output frequency to ESP, 470 = approx 1 minute
     sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
     /*********Output Moisture Sensor values to ESP8266******/
     Serial1.println(ESPString);
-//    delay(100);
-//    counter = 0;
     nextOutput = RTC.now() + outputFrequency;
   
      /* Optional - to display on Arduino serial monitor */
