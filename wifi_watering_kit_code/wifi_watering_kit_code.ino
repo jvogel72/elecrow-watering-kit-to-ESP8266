@@ -212,6 +212,7 @@ void loop() {
     enable_pump = 0;
   }
   read_value();
+  send_to_ESP();
   water_flower();
   int button_state = digitalRead(button);
   if (button_state == 1) {
@@ -237,18 +238,16 @@ void loop() {
     readSerial1();
 }
 
-// Set moisture value based on sensor readout
-//   600 is dry - value of 600 and above is 0%
-//   360 is wet - value of 360 is 100%
-void read_value() {
-  char ESPString[26];
-  for (int i = 0; i < sensors; ++i) {
-    float value = analogRead(moisture[i]);
-    moisture_value[i] = constrain(map(value, sensor_dry[i], sensor_wet[i], 0, 100), 0, 100);
-    delay(20);
-  }
+void send_to_ESP() {
+  char ESPString[80];
   if (RTC.now() >= nextOutput) {
-    sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
+    sprintf(ESPString, "%04d,%04d,%04d,%04d,%d,%04d,%02d%02d,%02d%02d,%04d,%04d,%04d,%04d,%04d,%04d,%04d,%04d,%1d%1d%1d%1d",
+      moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3],
+      pump_state_flag, water_level_value,
+      startHour, startMinute, endHour, endMinute,
+      min_moisture[0], min_moisture[1], min_moisture[2], min_moisture[3],
+      max_moisture[0], max_moisture[1], max_moisture[2], max_moisture[3],
+      relay_state_flags[0], relay_state_flags[1], relay_state_flags[2], relay_state_flags[3]);
     /*********Output Moisture Sensor values to ESP8266******/
     Serial1.println(ESPString);
     nextOutput = RTC.now() + outputFrequency;
@@ -260,6 +259,17 @@ void read_value() {
     Serial.println(serialDebug);
     delay(50); 
 */     
+  }
+}
+
+// Set moisture value based on sensor readout
+//   600 is dry - value of 600 and above is 0%
+//   360 is wet - value of 360 is 100%
+void read_value() {
+  for (int i = 0; i < sensors; ++i) {
+    float value = analogRead(moisture[i]);
+    moisture_value[i] = constrain(map(value, sensor_dry[i], sensor_wet[i], 0, 100), 0, 100);
+    delay(20);
   }
 }
 
@@ -411,41 +421,25 @@ void commandRTC() {
  * 
  * All elements in the communication have a 4 byte length
  * The first element defines the requested action
- *   0001 - get minimum and maxmum moisture levels
- *          response is 0001 appended with
- *            first the four minumum levels
- *            then the four maximum levels
- *          both in the sequence of A0 through A3
  *   0002 - set the minimum and maximum moisture levels
  *          sequence is identical to command 1
  *            first the four minumum levels
  *            then the four maximum levels
  *          both in the sequence of A0 through A3
- *   0003 - get the timeframe in which the device operates 
- *          response is 0003 appended with
+ *   0004 - set the timeframce in which the device operates
+ *          sequence is
  *            start hour
  *            start minute
  *            end hour
  *            end minute
- *   0004 - set the timeframce in which the device operates
- *          sequence is identical to command 0003
  */
 void commandESP() {
-  char serial1Reply[36];
   switch (serial1Vars[0]) {
-    case 1:
-      sprintf(serial1Reply, "0001%04d%04d%04d%04d%04d%04d%04d%04d", min_moisture[0], min_moisture[1], min_moisture[2], min_moisture[3], max_moisture[0], max_moisture[1], max_moisture[2], max_moisture[3]);
-      Serial1.println(serial1Reply);
-      break;
     case 2:
       for (int i = 0; i < sensors; ++i) {
         min_moisture[ i ] = serial1Vars[ i + 1 ];
         max_moisture[ i ] = serial1Vars[ i + 5 ];
       }
-      break;
-    case 3:
-      sprintf(serial1Reply, "0003%04d%04d%04d%04d", startHour, startMinute, endHour, endMinute);
-      Serial1.println(serial1Reply);
       break;
     case 4:
       startHour = serial1Vars[ 1 ];
