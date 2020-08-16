@@ -179,8 +179,8 @@ void setup() {
 }
 
 void loop() {
-  long t = 0, h = 0, hp = 0; //for Measuring water level
-   
+  long t = 0; //for Measuring water level
+
   /** The pump is automatically disabled if water tank level low **/
   // read water level and shut off pump is too low
   // Transmitting pulse
@@ -190,18 +190,27 @@ void loop() {
   digitalWrite(trig, HIGH);
   delayMicroseconds(10);
   digitalWrite(trig, LOW);
-  
+
   // Waiting for pulse
   t = pulseIn(echo, HIGH);
-  
-  // Calculating distance 
-  h = t / 58;
-  h = h - 6;  // offset correction (adjust as necessary for your water tank)
-  h = 50 - h;  // water height, 0 - 50 cm
-  hp = 2 * h;  // distance in %, 0-100 %
+
+  // Calculating distance, from original formula:
+  //   pulse = 0    -> distance % = 112
+  //   pulse = 348  -> distance % = 100
+  //   pulse = 3248 -> distance % = 0
+  // original formula:
+  //   h = t / 58;
+  //   h = h - 6;  // offset correction (adjust as necessary for your water tank)
+  //   h = 50 - h;  // water height, 0 - 50 cm
+  //   hp = 2 * h;  // distance in %, 0-100 %
+  //   water_level_value = hp
+  // added to original formula:
+  //   constrain to values between 0 and 100 percent
+  //   below 0   -> 0
+  //   above 100 -> 100
 
   //check pump reservoir water level 
-  water_level_value = hp; 
+  water_level_value = constrain(map(t, 3248, 348, 0, 100), 0, 100);
   delay(20);
   if (water_level_value < 0) {
     water_level_value = 0;
@@ -257,8 +266,8 @@ void send_to_ESP() {
     char serialDebug[50];
     sprintf(serialDebug, "A0: %d, A1: %d, A2: %d, A3: %d, Pump: %d, Water Level: %d", moisture_value[0], moisture_value[1], moisture_value[2], moisture_value[3], pump_state_flag, water_level_value);
     Serial.println(serialDebug);
-    delay(50); 
-*/     
+    delay(50);
+*/
   }
 }
 
